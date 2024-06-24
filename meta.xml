@@ -1,0 +1,10 @@
+<meta>
+    <script src="g_data.lua" type="shared"/>
+    <script src="c_data.lua" type="client"/>
+    <script src="c_loader.lua" type="client"/>
+    <script src="c_converter.lua" type="client"/>
+    <script src="s_reader.lua" type="server"/>
+    <min_mta_version client="1.6.0-9.22505.0" server="1.6.0-9.22505.0"></min_mta_version>
+    <!-- Auto load all IPL files -->
+    <file src="ipl/*.ipl"/>
+</meta>
