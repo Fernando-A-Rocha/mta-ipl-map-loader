@@ -14,8 +14,6 @@ The resource comes with an example [truthsfarm.ipl](/ipl/truthsfarm.ipl) file, w
 
 You can convert IPL maps to MTA:SA `Lua` and `.map` formats using the `/convertipl` command.
 
-```lua
-
 ## Screenshots
 
 ![exportedluacode](https://github.com/Fernando-A-Rocha/mta-ipl-map-loader/assets/34967844/5454391b-616c-4495-a75d-8f3aedda5643)
