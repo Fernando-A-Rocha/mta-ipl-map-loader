@@ -87,5 +87,5 @@ local function cmdConvertIPL(cmd, fileName, outputFormat)
 
     guiSetText(outputMemo, outputMapText)
 end
-addCommandHandler("convertipl", cmdConvertIPL, false)
+addCommandHandler(CONVERT_IPL_CMD, cmdConvertIPL, false)
 

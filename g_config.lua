@@ -5,3 +5,4 @@
 ]]
 
 IPL_FOLDER_NAME = "ipl"
+CONVERT_IPL_CMD = "convertipl"
