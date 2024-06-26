@@ -1,4 +1,10 @@
 <meta>
+
+    <info author="Fernando"
+        name="IPL Map Loader"
+        description="loads GTA:SA IPL format maps into MTA:SA"
+        version="1.1.0"
+        type="script"/>
     <script src="g_config.lua" type="shared"/>
     <script src="c_loader.lua" type="client"/>
     <script src="c_converter.lua" type="client"/>
