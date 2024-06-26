@@ -66,15 +66,6 @@ local function fromQuaternion(x, y, z, w)
 	return ox,oy,oz
 end
 
-local function isValidBuildingID(modelID)
-    for _, id in pairs(VALID_BUILDING_IDS) do
-        if id == modelID then
-            return true
-        end
-    end
-    return false
-end
-
 function getObjectsFromIPLFile(filePath)
     
     local file = fileOpen(filePath, true)
@@ -161,17 +152,19 @@ local function loadIPLMap(filePath)
 
     for _, object in pairs(objects) do
         local modelID, modelName, interiorID, x, y, z, rx, ry, rz = unpack(object)
-        
-        local element = isValidBuildingID(modelID)
-            and createBuilding(modelID, x, y, z, rx, ry, rz)
-            or createObject(modelID, x, y, z, rx, ry, rz)
-        if element then
-            elements[#elements + 1] = element
-            if getElementType(element) == "object" then
+        local shouldBeDynamicObject = engineGetModelPhysicalPropertiesGroup(modelID) ~= -1 or x < -3000 or x > 3000 or y < -3000 or y > 3000
+        local buildingOrObject = shouldBeDynamicObject and createObject(modelID, x, y, z, rx, ry, rz) or createBuilding(modelID, x, y, z, rx, ry, rz)
+        if buildingOrObject then
+            if interiorID > 0 then
+                setElementInterior(buildingOrObject, interiorID)
+            end
+            elements[#elements + 1] = buildingOrObject
+            if shouldBeDynamicObject then
                 countCreatedObjects = countCreatedObjects + 1
             end
             if DEBUG_MODE then
-                createBlip(x, y, z, 0, 1, 255, 0, 0, 255, 0, 999999)
+                local blip = createBlip(x, y, z, 0, 1, 255, 0, 0, 255, 0, 999999)
+                setElementParent(blip, buildingOrObject)
             end
         end
     end

@@ -1,6 +1,5 @@
 <meta>
     <script src="g_config.lua" type="shared"/>
-    <script src="c_data.lua" type="client"/>
     <script src="c_loader.lua" type="client"/>
     <script src="c_converter.lua" type="client"/>
     <script src="s_reader.lua" type="server"/>
