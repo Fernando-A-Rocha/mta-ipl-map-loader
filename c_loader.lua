@@ -79,7 +79,9 @@ function getObjectsFromIPLFile(filePath)
     end
 
     local lines = split(fileContent, "\n")
+    
     local objects = {}
+    local lodObjInfoToFind = {}
 
     local readingObjects = false
     for i=1, #lines do
@@ -111,7 +113,7 @@ function getObjectsFromIPLFile(filePath)
                     break
                 end
 
-                -- Model ID, Model Name, Interior ID, X, Y, Z, RX, RY, RZ, RW, (LOD optional)
+                -- Model ID, Model Name (useless), Interior ID, X, Y, Z, RX, RY, RZ, RW, LOD Number (optional)
                 local modelID = tonumber(objectData[1])
                 local modelName = objectData[2]
                 local interiorID = tonumber(objectData[3])
@@ -122,16 +124,31 @@ function getObjectsFromIPLFile(filePath)
                 local ry = tonumber(objectData[8])
                 local rz = tonumber(objectData[9])
                 local rw = tonumber(objectData[10])
-                -- local lod = objectData[11] and tonumber(objectData[11]) or nil -- TODO ?
+                local lodNumber = tonumber(objectData[11])
 
                 if not modelID or not modelName or not interiorID or not x or not y or not z or not rx or not ry or not rz or not rw then
                     break
                 end
+                local objTableIndex = #objects + 1
+
+                -- LOD number is used to determine which object is the LOD of this object, based on the order they are read
+                if lodNumber and lodNumber ~= -1 then
+                    lodObjInfoToFind[lodNumber] = objTableIndex
+                end
+
                 rx, ry, rz = fromQuaternion(rx, ry, rz, rw)
-                objects[#objects + 1] = {modelID, modelName, interiorID, x, y, z, rx, ry, rz}
+                objects[objTableIndex] = {modelID, interiorID, x, y, z, rx, ry, rz}
             end
 
             break
+        end
+    end
+
+    for lodNumber, objTableIndex in pairs(lodObjInfoToFind) do
+        local objectData = objects[objTableIndex]
+        local lodObjInfo = objects[lodNumber + 1]
+        if lodObjInfo then
+            objectData[9] = lodObjInfo
         end
     end
 
@@ -151,20 +168,50 @@ local function loadIPLMap(filePath)
     local countCreatedObjects = 0
 
     for _, object in pairs(objects) do
-        local modelID, modelName, interiorID, x, y, z, rx, ry, rz = unpack(object)
-        local shouldBeDynamicObject = engineGetModelPhysicalPropertiesGroup(modelID) ~= -1 or x < -3000 or x > 3000 or y < -3000 or y > 3000
-        local buildingOrObject = shouldBeDynamicObject and createObject(modelID, x, y, z, rx, ry, rz) or createBuilding(modelID, x, y, z, rx, ry, rz)
+
+        local modelID, interiorID, x, y, z, rx, ry, rz, lodObjInfo = unpack(object)
+
+        local shouldBeDynamicObject = (engineGetModelPhysicalPropertiesGroup(modelID) ~= -1
+            or x < -3000 or x > 3000 or y < -3000 or y > 3000)
+
+        local buildingOrObject = shouldBeDynamicObject and createObject(modelID, x, y, z, rx, ry, rz)
+            or createBuilding(modelID, x, y, z, rx, ry, rz, (interiorID > 0 and interiorID or 0))
         if buildingOrObject then
-            if interiorID > 0 then
+
+            if shouldBeDynamicObject and interiorID > 0 then
                 setElementInterior(buildingOrObject, interiorID)
             end
+
             elements[#elements + 1] = buildingOrObject
+            
             if shouldBeDynamicObject then
                 countCreatedObjects = countCreatedObjects + 1
             end
             if DEBUG_MODE then
                 local blip = createBlip(x, y, z, 0, 1, 255, 0, 0, 255, 0, 999999)
                 setElementParent(blip, buildingOrObject)
+            end
+
+            if lodObjInfo then
+                local lod_modelID, lod_interiorID, lod_x, lod_y, lod_z, lod_rx, lod_ry, lod_rz = unpack(lodObjInfo)
+
+                local lod_shouldBeDynamicObject = (engineGetModelPhysicalPropertiesGroup(lod_modelID) ~= -1
+                    or lod_x < -3000 or lod_x > 3000 or lod_y < -3000 or lod_y > 3000)
+
+                local lod_buildingOrObject = lod_shouldBeDynamicObject and createObject(lod_modelID, lod_x, lod_y, lod_z, lod_rx, lod_ry, lod_rz, true)
+                    or createBuilding(lod_modelID, lod_x, lod_y, lod_z, lod_rx, lod_ry, lod_rz, (lod_interiorID > 0 and lod_interiorID or 0))
+                if lod_buildingOrObject then
+                    
+                    if lod_shouldBeDynamicObject and lod_interiorID > 0 then
+                        setElementInterior(lod_buildingOrObject, lod_interiorID)
+                    end
+
+                    elements[#elements + 1] = lod_buildingOrObject
+
+                    if lod_shouldBeDynamicObject then
+                        countCreatedObjects = countCreatedObjects + 1
+                    end
+                end
             end
         end
     end
