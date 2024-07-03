@@ -137,7 +137,7 @@ function getObjectsFromIPLFile(filePath)
                 end
 
                 rx, ry, rz = fromQuaternion(rx, ry, rz, rw)
-                objects[objTableIndex] = {modelID, interiorID, x, y, z, rx, ry, rz}
+                objects[objTableIndex] = {modelID, modelName, interiorID, x, y, z, rx, ry, rz}
             end
 
             break
@@ -148,7 +148,10 @@ function getObjectsFromIPLFile(filePath)
         local objectData = objects[objTableIndex]
         local lodObjInfo = objects[lodNumber + 1]
         if lodObjInfo then
-            objectData[9] = lodObjInfo
+            local lod_modelID, lod_modelName, lod_interiorID, lod_x, lod_y, lod_z, lod_rx, lod_ry, lod_rz = unpack(lodObjInfo)
+            objectData[10] = {lod_modelID, lod_modelName, lod_interiorID, lod_x, lod_y, lod_z, lod_rx, lod_ry, lod_rz}
+            -- Remove LOD object from the list, as it will be spawned with the main object
+            objects[lodNumber + 1] = nil
         end
     end
 
@@ -169,7 +172,7 @@ local function loadIPLMap(filePath)
 
     for _, object in pairs(objects) do
 
-        local modelID, interiorID, x, y, z, rx, ry, rz, lodObjInfo = unpack(object)
+        local modelID, modelName, interiorID, x, y, z, rx, ry, rz, lodObjInfo = unpack(object)
 
         local shouldBeDynamicObject = (engineGetModelPhysicalPropertiesGroup(modelID) ~= -1
             or x < -3000 or x > 3000 or y < -3000 or y > 3000)
@@ -193,7 +196,7 @@ local function loadIPLMap(filePath)
             end
 
             if lodObjInfo then
-                local lod_modelID, lod_interiorID, lod_x, lod_y, lod_z, lod_rx, lod_ry, lod_rz = unpack(lodObjInfo)
+                local lod_modelID, lod_modelName, lod_interiorID, lod_x, lod_y, lod_z, lod_rx, lod_ry, lod_rz = unpack(lodObjInfo)
 
                 local lod_shouldBeDynamicObject = (engineGetModelPhysicalPropertiesGroup(lod_modelID) ~= -1
                     or lod_x < -3000 or lod_x > 3000 or lod_y < -3000 or lod_y > 3000)

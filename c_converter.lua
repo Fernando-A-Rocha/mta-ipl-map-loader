@@ -7,31 +7,61 @@
 local resourceName = getResourceName(resource)
 local outputGUIWindow = nil
 
+local function pairsByKeys(t)
+    local a = {}
+    for n in pairs(t) do
+        table.insert(a, n)
+    end
+    table.sort(a)
+    local i = 0
+    local iter = function()
+        i = i + 1
+        if a[i] == nil then
+            return nil
+        else
+            return a[i], t[a[i]]
+        end
+    end
+    return iter
+end
+
 local function convertObjectsToFormat(objects, outputFormat, fileName)
     local str = ""
     if outputFormat == "lua" then
         local realTime = getRealTime()
         local timestampStr = string.format("%02d/%02d/%04d at %02d:%02d:%02d", realTime.monthday, realTime.month+1, realTime.year+1900, realTime.hour, realTime.minute, realTime.second)
-        str = str .. ("-- Map '%s' converted on %s using %s\n"):format(fileName, timestampStr, "MTA:SA " .. resourceName)
+        str = ("-- Map '%s' converted on %s using %s\n"):format(fileName, timestampStr, "MTA:SA " .. resourceName)
         str = str .. "local objects = {\n"
-        for i=1, #objects do
-            local object = objects[i]
-            local modelID, modelName, interiorID, x, y, z, rx, ry, rz = unpack(object)
-            str = str .. ("    {%d, %f, %f, %f, %f, %f, %f, %d}, -- %s\n"):format(modelID, x, y, z, rx, ry, rz, interiorID, modelName)
+        for _, object in pairsByKeys(objects) do
+            local modelID, modelName, interiorID, x, y, z, rx, ry, rz, lodObjInfo = unpack(object)
+            str = str .. ("    {%d, %f, %f, %f, %f, %f, %f, %d, false}, -- %s\n"):format(modelID, x, y, z, rx, ry, rz, interiorID, modelName)
+            if lodObjInfo then
+                local lod_modelID, lod_modelName, lod_interiorID, lod_x, lod_y, lod_z, lod_rx, lod_ry, lod_rz = unpack(lodObjInfo)
+                str = str .. ("    {%d, %f, %f, %f, %f, %f, %f, %d, true}, -- %s\n"):format(lod_modelID, lod_x, lod_y, lod_z, lod_rx, lod_ry, lod_rz, lod_interiorID, lod_modelName)
+            end
         end
         str = str .. "}\n"
-        str = str .. "for i=1, #objects do\n"
-        str = str .. "    local object = objects[i]\n"
-        str = str .. "    local modelID, x, y, z, rx, ry, rz, interiorID = unpack(object)\n"
-        str = str .. "    local object = createObject(modelID, x, y, z, rx, ry, rz)\n"
-        str = str .. "    if object then setElementInterior(object, interiorID) end\n"
-        str = str .. "end\n"
+        str = str .. [[
+local previousObject = nil
+for i=1, #objects do
+    local object = objects[i]
+    local modelID, x, y, z, rx, ry, rz, interiorID, isLodOfPrevious = unpack(object)
+    local object = createObject(modelID, x, y, z, rx, ry, rz, isLodOfPrevious and true or false)
+    if object then
+        setElementInterior(object, interiorID)
+        if isLodOfPrevious and previousObject then
+            setLowLODElement(previousObject, object)
+        end
+        previousObject = object
+    end
+end]]
     elseif outputFormat == "map" then
         -- MTA:SA XML Map Format
         str = str .. '<map edf:definitions="editor_main">\n'
         for i=1, #objects do
             local object = objects[i]
-            local modelID, modelName, interiorID, x, y, z, rx, ry, rz = unpack(object)
+            local modelID, modelName, interiorID, x, y, z, rx, ry, rz, lodObjInfo = unpack(object)
+            -- MTA map loading system will currently automatically create the matching LOD object
             str = str .. ('    <object id="%d (%d - %s)" model="%d" interior="%d" posX="%f" posY="%f" posZ="%f" rotX="%f" rotY="%f" rotZ="%f" breakable="false" alpha="255" dimension="0" scale="1" doublesided="false" collisions="true" frozen="false"/>\n'):format(i, modelID, modelName, modelID, interiorID, x, y, z, rx, ry, rz)
         end
         str = str .. '</map>\n'
