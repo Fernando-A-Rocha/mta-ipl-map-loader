@@ -31,38 +31,47 @@ local function convertObjectsToFormat(objects, outputFormat, fileName)
         local realTime = getRealTime()
         local timestampStr = string.format("%02d/%02d/%04d at %02d:%02d:%02d", realTime.monthday, realTime.month+1, realTime.year+1900, realTime.hour, realTime.minute, realTime.second)
         str = ("-- Map '%s' converted on %s using %s\n"):format(fileName, timestampStr, "MTA:SA " .. resourceName)
-        str = str .. "local objects = {\n"
+        str = str .. "local objectsToSpawn = {\n"
         for _, object in pairsByKeys(objects) do
             local modelID, modelName, interiorID, x, y, z, rx, ry, rz, lodObjInfo = unpack(object)
-            str = str .. ("    {%d, %f, %f, %f, %f, %f, %f, %d, false}, -- %s\n"):format(modelID, x, y, z, rx, ry, rz, interiorID, modelName)
-            if lodObjInfo then
+            local shouldBeDynamicObject = (engineGetModelPhysicalPropertiesGroup(modelID) ~= -1
+                or x < -3000 or x > 3000 or y < -3000 or y > 3000)
+            str = str .. ("    {%s, %d, %d, %f, %f, %f, %f, %f, %f, false}, -- %s\n"):format(tostring(shouldBeDynamicObject), modelID, interiorID, x, y, z, rx, ry, rz, modelName)
+            if lodObjInfo then -- Insert corresponding LOD object line
                 local lod_modelID, lod_modelName, lod_interiorID, lod_x, lod_y, lod_z, lod_rx, lod_ry, lod_rz = unpack(lodObjInfo)
-                str = str .. ("    {%d, %f, %f, %f, %f, %f, %f, %d, true}, -- %s\n"):format(lod_modelID, lod_x, lod_y, lod_z, lod_rx, lod_ry, lod_rz, lod_interiorID, lod_modelName)
+                local lod_shouldBeDynamicObject = (engineGetModelPhysicalPropertiesGroup(lod_modelID) ~= -1
+                    or lod_x < -3000 or lod_x > 3000 or lod_y < -3000 or lod_y > 3000)
+                str = str .. ("    {%s, %d, %d, %f, %f, %f, %f, %f, %f, true}, -- %s\n"):format(tostring(lod_shouldBeDynamicObject), lod_modelID, lod_interiorID, lod_x, lod_y, lod_z, lod_rx, lod_ry, lod_rz, lod_modelName)
             end
         end
         str = str .. "}\n"
-        str = str .. [[
-local previousObject = nil
-for i=1, #objects do
-    local object = objects[i]
-    local modelID, x, y, z, rx, ry, rz, interiorID, isLodOfPrevious = unpack(object)
-    local object = createObject(modelID, x, y, z, rx, ry, rz, isLodOfPrevious and true or false)
-    if object then
-        setElementInterior(object, interiorID)
-        if isLodOfPrevious and previousObject then
-            setLowLODElement(previousObject, object)
+        str = str.. [[
+local previousObjOrBuild = nil
+for i=1, #objectsToSpawn do
+    local isDynamic, modelID, interiorID, x, y, z, rx, ry, rz, isLodOfPrevious = unpack(objectsToSpawn[i])
+    local objectOrBuilding = isDynamic and createObject(modelID, x, y, z, rx, ry, rz, isLodOfPrevious and true or false)
+        or createBuilding(modelID, x, y, z, rx, ry, rz, (interiorID > 0 and interiorID or 0))
+    if objectOrBuilding then
+        if isDynamic and interiorID > 0 then
+            setElementInterior(objectOrBuilding, interiorID)
         end
-        previousObject = object
+        if isLodOfPrevious and previousObjOrBuild then
+            setLowLODElement(previousObjOrBuild, objectOrBuilding)
+        end
+        previousObjOrBuild = objectOrBuilding
     end
-end]]
-    elseif outputFormat == "map" then
-        -- MTA:SA XML Map Format
+end
+previousObjOrBuild = nil]]
+    elseif outputFormat == "map" then -- MTA:SA XML Map Format
         str = str .. '<map edf:definitions="editor_main">\n'
-        for i=1, #objects do
-            local object = objects[i]
+        local i = 1
+        for _, object in pairsByKeys(objects) do
             local modelID, modelName, interiorID, x, y, z, rx, ry, rz, lodObjInfo = unpack(object)
             -- MTA map loading system will currently automatically create the matching LOD object
-            str = str .. ('    <object id="%d (%d - %s)" model="%d" interior="%d" posX="%f" posY="%f" posZ="%f" rotX="%f" rotY="%f" rotZ="%f" breakable="false" alpha="255" dimension="0" scale="1" doublesided="false" collisions="true" frozen="false"/>\n'):format(i, modelID, modelName, modelID, interiorID, x, y, z, rx, ry, rz)
+            str = str .. (
+                '    <object id="%d (%s)" model="%d" interior="%d" posX="%f" posY="%f" posZ="%f" rotX="%f" rotY="%f" rotZ="%f" breakable="false" alpha="255" dimension="0" scale="1" doublesided="false" collisions="true" frozen="false"/>\n'
+            ):format(i, modelName, modelID, interiorID, x, y, z, rx, ry, rz)
+            i = i + 1
         end
         str = str .. '</map>\n'
     end
@@ -93,7 +102,7 @@ local function cmdConvertIPL(cmd, fileName, outputFormat)
     if outputGUIWindow and isElement(outputGUIWindow) then
         destroyElement(outputGUIWindow)
     end
-    outputGUIWindow = guiCreateWindow(0.5, 0.5, 0.4, 0.4, ("IPL Converter - %s (%s)"):format(fileName, outputFormat), true)
+    outputGUIWindow = guiCreateWindow(0.15, 0.15, 0.7, 0.7, ("IPL Converter - %s (%s)"):format(fileName, outputFormat), true)
     local outputMemo = guiCreateMemo(0.05, 0.05, 0.9, 0.8, "", true, outputGUIWindow)
     guiMemoSetReadOnly(outputMemo, true)
     local copyBtn = guiCreateButton(0.05, 0.87, 0.45, 0.1, "Copy to clipboard", true, outputGUIWindow)
